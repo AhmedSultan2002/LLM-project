@@ -38,4 +38,11 @@ models/
 
 # Project description docs (not part of codebase)
 *.pdf
+!report/report.pdf
 *.htm
+
+# LaTeX auxiliary files
+report/*.aux
+report/*.log
+report/*.out
+report/*.toc
