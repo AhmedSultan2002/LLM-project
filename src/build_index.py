@@ -10,13 +10,11 @@ Usage:
 
 import json
 import os
-import sys
 
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.settings import (
     PROCESSED_DOCS_PATH,
     FAISS_INDEX_PATH,
@@ -28,12 +26,26 @@ from config.settings import (
 
 def load_documents(path: str) -> list[dict]:
     """Load the processed document corpus."""
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"Processed corpus not found at '{path}'.\n"
+            "Run 'python src/data_preprocessing.py' first to generate it."
+        )
 
 
-def generate_embeddings(texts: list[str], model_name: str) -> np.ndarray:
-    """Generate sentence embeddings using a SentenceTransformer model."""
+def generate_embeddings(
+    texts: list[str], model_name: str
+) -> tuple[np.ndarray, SentenceTransformer]:
+    """
+    Generate sentence embeddings using a SentenceTransformer model.
+
+    Returns:
+        Tuple of (embeddings array, loaded model) — model is returned so the
+        caller can reuse it without loading it a second time.
+    """
     print(f"Loading embedding model: {model_name}")
     model = SentenceTransformer(model_name)
 
@@ -44,7 +56,7 @@ def generate_embeddings(texts: list[str], model_name: str) -> np.ndarray:
         normalize_embeddings=True,  # Normalize for cosine similarity via inner product
         batch_size=64,
     )
-    return np.array(embeddings, dtype="float32")
+    return np.array(embeddings, dtype="float32"), model
 
 
 def build_faiss_index(embeddings: np.ndarray) -> faiss.IndexFlatIP:
@@ -53,6 +65,10 @@ def build_faiss_index(embeddings: np.ndarray) -> faiss.IndexFlatIP:
     IndexFlatIP is exact search — perfectly fine for our ~300 document corpus.
     """
     dim = embeddings.shape[1]
+    assert dim == EMBEDDING_DIMENSION, (
+        f"Embedding dimension mismatch: got {dim}, expected {EMBEDDING_DIMENSION}. "
+        "Check EMBEDDING_DIMENSION in config/settings.py."
+    )
     print(f"Building FAISS index: {embeddings.shape[0]} vectors, dim={dim}")
     index = faiss.IndexFlatIP(dim)
     index.add(embeddings)
@@ -73,13 +89,15 @@ def save_doc_mapping(documents: list[dict], mapping_path: str) -> None:
     """
     mapping = []
     for i, doc in enumerate(documents):
-        mapping.append({
-            "id": i,
-            "question": doc["question"],
-            "answer": doc["answer"],
-            "product": doc["product"],
-            "source": doc["source"],
-        })
+        mapping.append(
+            {
+                "id": i,
+                "question": doc["question"],
+                "answer": doc["answer"],
+                "product": doc["product"],
+                "source": doc["source"],
+            }
+        )
     with open(mapping_path, "w", encoding="utf-8") as f:
         json.dump(mapping, f, indent=2, ensure_ascii=False)
     print(f"Document mapping saved to {mapping_path}")
@@ -97,8 +115,8 @@ if __name__ == "__main__":
     # 2. Extract text chunks for embedding
     texts = [doc["text"] for doc in documents]
 
-    # 3. Generate embeddings
-    embeddings = generate_embeddings(texts, EMBEDDING_MODEL_NAME)
+    # 3. Generate embeddings (model is returned for reuse in the sanity check)
+    embeddings, embedding_model = generate_embeddings(texts, EMBEDDING_MODEL_NAME)
     print(f"Embeddings shape: {embeddings.shape}")
 
     # 4. Build and save FAISS index
@@ -108,11 +126,10 @@ if __name__ == "__main__":
     # 5. Save document mapping
     save_doc_mapping(documents, DOC_MAPPING_PATH)
 
-    # 6. Quick sanity check — search for a test query
+    # 6. Quick sanity check — search for a test query (reuses already-loaded model)
     print("\n── Sanity Check ──")
-    model = SentenceTransformer(EMBEDDING_MODEL_NAME)
     test_query = "What is the daily transfer limit?"
-    query_embedding = model.encode([test_query], normalize_embeddings=True)
+    query_embedding = embedding_model.encode([test_query], normalize_embeddings=True)
     query_embedding = np.array(query_embedding, dtype="float32")
 
     distances, indices = index.search(query_embedding, k=3)

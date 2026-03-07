@@ -11,18 +11,16 @@ Usage:
 import json
 import os
 import re
-import sys
 
 import openpyxl
 
-# Allow running as script from project root
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.settings import RAW_EXCEL_PATH, RAW_JSON_PATH, DATA_DIR, PROCESSED_DOCS_PATH
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Text Cleaning
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def clean_text(text: str) -> str:
     """Normalize unicode, whitespace, and strip a text string."""
@@ -41,6 +39,7 @@ def clean_text(text: str) -> str:
 # ──────────────────────────────────────────────────────────────────────────────
 # Excel Parser
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def parse_excel(filepath: str) -> list[dict]:
     """
@@ -107,12 +106,14 @@ def parse_excel(filepath: str) -> list[dict]:
 
                 answer = " ".join(answer_parts).strip()
                 if answer:
-                    documents.append({
-                        "question": question,
-                        "answer": answer,
-                        "product": product_title,
-                        "source": f"excel:{sheet_name}",
-                    })
+                    documents.append(
+                        {
+                            "question": question,
+                            "answer": answer,
+                            "product": product_title,
+                            "source": f"excel:{sheet_name}",
+                        }
+                    )
                 i = j  # Skip to where we left off
             else:
                 i += 1
@@ -127,9 +128,21 @@ def _is_question(text: str) -> bool:
         return True
     lower = text.lower()
     question_starters = [
-        "what ", "how ", "can ", "is ", "does ", "do ", "will ",
-        "are ", "which ", "who ", "when ", "where ", "why ",
-        "for which", "in case",
+        "what ",
+        "how ",
+        "can ",
+        "is ",
+        "does ",
+        "do ",
+        "will ",
+        "are ",
+        "which ",
+        "who ",
+        "when ",
+        "where ",
+        "why ",
+        "for which",
+        "in case",
     ]
     return any(lower.startswith(s) for s in question_starters)
 
@@ -137,6 +150,7 @@ def _is_question(text: str) -> bool:
 # ──────────────────────────────────────────────────────────────────────────────
 # JSON Parser
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def parse_json_faq(filepath: str) -> list[dict]:
     """Parse the funds transfer app features FAQ JSON file."""
@@ -150,18 +164,21 @@ def parse_json_faq(filepath: str) -> list[dict]:
             question = clean_text(qa.get("question", ""))
             answer = clean_text(qa.get("answer", ""))
             if question and answer:
-                documents.append({
-                    "question": question,
-                    "answer": answer,
-                    "product": f"Mobile App — {cat_name}",
-                    "source": "json:funds_transfer_faq",
-                })
+                documents.append(
+                    {
+                        "question": question,
+                        "answer": answer,
+                        "product": f"Mobile App — {cat_name}",
+                        "source": "json:funds_transfer_faq",
+                    }
+                )
     return documents
 
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Corpus Builder
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def build_corpus() -> list[dict]:
     """
@@ -175,22 +192,48 @@ def build_corpus() -> list[dict]:
         - text: str  (combined chunk for embedding)
     """
     print("Parsing Excel workbook...")
+    if not os.path.exists(RAW_EXCEL_PATH):
+        raise FileNotFoundError(
+            f"Excel workbook not found at '{RAW_EXCEL_PATH}'.\n"
+            "Ensure 'NUST Bank-Product-Knowledge.xlsx' is in the project root."
+        )
     excel_docs = parse_excel(RAW_EXCEL_PATH)
     print(f"  → Extracted {len(excel_docs)} Q&A pairs from Excel")
 
     print("Parsing JSON FAQ...")
+    if not os.path.exists(RAW_JSON_PATH):
+        raise FileNotFoundError(
+            f"JSON FAQ not found at '{RAW_JSON_PATH}'.\n"
+            "Ensure 'funds_transfer_app_features_faq.json' is in the project root."
+        )
     json_docs = parse_json_faq(RAW_JSON_PATH)
     print(f"  → Extracted {len(json_docs)} Q&A pairs from JSON")
 
     # Combine
     all_docs = excel_docs + json_docs
 
+    # Deduplicate by (question, product) — same question appearing in multiple
+    # Excel sheets (e.g. "What is the Target Market?") creates noise in the index.
+    seen: set[tuple[str, str]] = set()
+    unique_docs: list[dict] = []
+    duplicates = 0
+    for doc in all_docs:
+        key = (doc["question"].lower(), doc["product"].lower())
+        if key in seen:
+            duplicates += 1
+            continue
+        seen.add(key)
+        unique_docs.append(doc)
+
+    if duplicates:
+        print(f"  → Removed {duplicates} duplicate Q&A entries")
+
+    all_docs = unique_docs
+
     # Build the combined text chunk for each document
     for doc in all_docs:
         doc["text"] = (
-            f"Product: {doc['product']}\n"
-            f"Q: {doc['question']}\n"
-            f"A: {doc['answer']}"
+            f"Product: {doc['product']}\nQ: {doc['question']}\nA: {doc['answer']}"
         )
 
     print(f"\nTotal corpus: {len(all_docs)} documents")
