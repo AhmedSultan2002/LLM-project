@@ -1,0 +1,32 @@
+"""
+Centralized configuration for the NUST Bank LLM project.
+All paths, model names, and hyperparameters in one place.
+"""
+
+import os
+
+# ─── Paths ────────────────────────────────────────────────────────────────────
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+# Raw data
+RAW_EXCEL_PATH = os.path.join(PROJECT_ROOT, "NUST Bank-Product-Knowledge.xlsx")
+RAW_JSON_PATH = os.path.join(PROJECT_ROOT, "funds_transfer_app_features_faq.json")
+
+# Processed data
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+PROCESSED_DOCS_PATH = os.path.join(DATA_DIR, "processed_documents.json")
+FAISS_INDEX_PATH = os.path.join(DATA_DIR, "faiss_index.bin")
+DOC_MAPPING_PATH = os.path.join(DATA_DIR, "doc_mapping.json")
+
+# ─── Embedding Model ─────────────────────────────────────────────────────────
+EMBEDDING_MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
+EMBEDDING_DIMENSION = 384
+
+# ─── LLM ──────────────────────────────────────────────────────────────────────
+LLM_MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
+LLM_MAX_NEW_TOKENS = 512
+LLM_TEMPERATURE = 0.3
+LLM_USE_4BIT = True  # 4-bit quantization for RTX 4060 (8GB VRAM)
+
+# ─── RAG ──────────────────────────────────────────────────────────────────────
+RAG_TOP_K = 3  # Number of retrieved chunks for context

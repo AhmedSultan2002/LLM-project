@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Project-specific
+data/faiss_index.bin
+data/doc_mapping.json
+data/processed_documents.json
+
+# Temporary / scratch files
+read_excel.py
+
+# Model cache (don't upload multi-GB models)
+models/
+*.bin
+!data/*.json
+
+# Environment
+.env
+
+# Project description docs (not part of codebase)
+*.txt
+*.htm
