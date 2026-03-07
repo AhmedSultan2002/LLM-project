@@ -83,6 +83,10 @@ python src/rag_pipeline.py
 python src/rag_pipeline.py --query "What is the daily transfer limit?"
 ```
 
+> **Note:** The interactive mode is **stateless** — each question is processed independently
+> with no memory of previous turns. Follow-up questions like "tell me more about that"
+> will not work as expected. Each question should be self-contained.
+
 ## Project Structure
 
 ```
