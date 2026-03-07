@@ -1,8 +1,15 @@
-torch
-transformers
-sentence-transformers
-faiss-cpu
-openpyxl
-numpy
-accelerate
-bitsandbytes
+# Core ML dependencies
+# Note: Install PyTorch separately with CUDA support first:
+#   pip install torch==2.5.1+cu124 torchvision==0.20.1+cu124 torchaudio==2.5.1+cu124 \
+#       --index-url https://download.pytorch.org/whl/cu124
+torch==2.5.1
+transformers==4.46.3
+sentence-transformers==3.3.1
+faiss-cpu==1.9.0
+openpyxl==3.1.5
+numpy==1.26.4
+accelerate==1.2.1
+bitsandbytes==0.42.0
+
+# Dev / testing dependencies
+pytest==8.3.4
