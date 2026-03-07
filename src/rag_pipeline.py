@@ -12,14 +12,12 @@ Usage:
 import argparse
 import json
 import os
-import sys
 import time
 
 import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config.settings import (
     FAISS_INDEX_PATH,
     DOC_MAPPING_PATH,
@@ -27,6 +25,9 @@ from config.settings import (
     LLM_MODEL_NAME,
     LLM_MAX_NEW_TOKENS,
     LLM_TEMPERATURE,
+    LLM_TOP_P,
+    LLM_REPETITION_PENALTY,
+    LLM_MAX_INPUT_LENGTH,
     LLM_USE_4BIT,
     RAG_TOP_K,
 )
@@ -34,6 +35,7 @@ from config.settings import (
 # ──────────────────────────────────────────────────────────────────────────────
 # Retriever
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class Retriever:
     """Handles query embedding and FAISS similarity search."""
@@ -43,9 +45,19 @@ class Retriever:
         self.model = SentenceTransformer(EMBEDDING_MODEL_NAME)
 
         print("Loading FAISS index...")
+        if not os.path.exists(FAISS_INDEX_PATH):
+            raise FileNotFoundError(
+                f"FAISS index not found at '{FAISS_INDEX_PATH}'.\n"
+                "Run 'python src/build_index.py' first to generate it."
+            )
         self.index = faiss.read_index(FAISS_INDEX_PATH)
 
         print("Loading document mapping...")
+        if not os.path.exists(DOC_MAPPING_PATH):
+            raise FileNotFoundError(
+                f"Document mapping not found at '{DOC_MAPPING_PATH}'.\n"
+                "Run 'python src/build_index.py' first to generate it."
+            )
         with open(DOC_MAPPING_PATH, "r", encoding="utf-8") as f:
             self.doc_mapping = json.load(f)
 
@@ -59,9 +71,7 @@ class Retriever:
             List of dicts with 'question', 'answer', 'product', 'source', 'score'.
         """
         # Encode query
-        query_embedding = self.model.encode(
-            [query], normalize_embeddings=True
-        )
+        query_embedding = self.model.encode([query], normalize_embeddings=True)
         query_embedding = np.array(query_embedding, dtype="float32")
 
         # Search FAISS index
@@ -130,12 +140,17 @@ def format_chat_prompt(system_prompt: str, user_message: str, tokenizer) -> str:
 # LLM Generator
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 class Generator:
     """Handles LLM loading and text generation."""
 
     def __init__(self):
         import torch
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+
+        self._torch = (
+            torch  # Store reference so generate() can reuse it without re-importing
+        )
 
         print(f"Loading LLM: {LLM_MODEL_NAME}")
         print(f"  4-bit quantization: {LLM_USE_4BIT}")
@@ -170,7 +185,7 @@ class Generator:
 
     def generate(self, query: str, retrieved_docs: list[dict]) -> str:
         """Generate a response given a query and retrieved documents."""
-        import torch
+        torch = self._torch  # Reuse the already-imported torch from __init__
 
         # Build prompt
         user_message = build_prompt(query, retrieved_docs)
@@ -178,7 +193,10 @@ class Generator:
 
         # Tokenize
         inputs = self.tokenizer(
-            full_prompt, return_tensors="pt", truncation=True, max_length=2048
+            full_prompt,
+            return_tensors="pt",
+            truncation=True,
+            max_length=LLM_MAX_INPUT_LENGTH,
         ).to(self.model.device)
 
         # Generate
@@ -188,13 +206,13 @@ class Generator:
                 max_new_tokens=LLM_MAX_NEW_TOKENS,
                 temperature=LLM_TEMPERATURE,
                 do_sample=True,
-                top_p=0.9,
-                repetition_penalty=1.1,
+                top_p=LLM_TOP_P,
+                repetition_penalty=LLM_REPETITION_PENALTY,
                 pad_token_id=self.tokenizer.eos_token_id,
             )
 
         # Decode only the generated tokens (skip the prompt)
-        generated_tokens = outputs[0][inputs["input_ids"].shape[1]:]
+        generated_tokens = outputs[0][inputs["input_ids"].shape[1] :]
         response = self.tokenizer.decode(generated_tokens, skip_special_tokens=True)
 
         return response.strip()
@@ -203,6 +221,7 @@ class Generator:
 # ──────────────────────────────────────────────────────────────────────────────
 # RAG Pipeline (ties it all together)
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 class RAGPipeline:
     """Full Retrieval-Augmented Generation pipeline."""
@@ -247,6 +266,7 @@ class RAGPipeline:
 # Main
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def main():
     parser = argparse.ArgumentParser(description="NUST Bank RAG Pipeline")
     parser.add_argument("--query", type=str, help="Single query mode")
@@ -286,8 +306,10 @@ def main():
             result = pipeline.query(user_input)
 
             print(f"\nAssistant: {result['answer']}")
-            print(f"\n  [Sources: {', '.join(s['product'] for s in result['sources'])} | "
-                  f"Latency: {result['latency_seconds']}s]")
+            print(
+                f"\n  [Sources: {', '.join(s['product'] for s in result['sources'])} | "
+                f"Latency: {result['latency_seconds']}s]"
+            )
             print()
 
 

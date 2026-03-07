@@ -26,6 +26,9 @@ EMBEDDING_DIMENSION = 384
 LLM_MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
 LLM_MAX_NEW_TOKENS = 512
 LLM_TEMPERATURE = 0.3
+LLM_TOP_P = 0.9
+LLM_REPETITION_PENALTY = 1.1
+LLM_MAX_INPUT_LENGTH = 2048  # Tokenizer truncation limit
 LLM_USE_4BIT = True  # 4-bit quantization for RTX 4060 (8GB VRAM)
 
 # ─── RAG ──────────────────────────────────────────────────────────────────────
