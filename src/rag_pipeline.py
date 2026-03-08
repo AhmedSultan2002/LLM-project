@@ -9,9 +9,20 @@ Usage:
     python src/rag_pipeline.py --query "your question"   # Single query mode
 """
 
+# ── Environment setup (must happen before any heavy imports) ──────────────────
+# On macOS, FAISS and sentence-transformers each initialise OpenMP/BLAS thread
+# pools.  When the HuggingFace safetensors loader later spawns its own Rust
+# thread pool a deadlock can occur on Apple Silicon.  Limiting all thread pools
+# to 1 avoids the deadlock while still allowing MPS GPU parallelism.
+import os
+
+os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+# ─────────────────────────────────────────────────────────────────────────────
+
 import argparse
 import json
-import os
 import time
 
 import faiss
@@ -29,6 +40,8 @@ from config.settings import (
     LLM_REPETITION_PENALTY,
     LLM_MAX_INPUT_LENGTH,
     LLM_USE_4BIT,
+    DEVICE,
+    QUANTIZATION_ENABLED,
     RAG_TOP_K,
 )
 
@@ -146,18 +159,22 @@ class Generator:
 
     def __init__(self):
         import torch
-        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+        from transformers import AutoModelForCausalLM, AutoTokenizer
 
         self._torch = (
             torch  # Store reference so generate() can reuse it without re-importing
         )
 
         print(f"Loading LLM: {LLM_MODEL_NAME}")
-        print(f"  4-bit quantization: {LLM_USE_4BIT}")
+        print(f"  Device: {DEVICE}")
+        print(f"  4-bit quantization: {QUANTIZATION_ENABLED}")
 
         self.tokenizer = AutoTokenizer.from_pretrained(LLM_MODEL_NAME)
 
-        if LLM_USE_4BIT:
+        if QUANTIZATION_ENABLED:
+            # ── CUDA path: bitsandbytes NF4 4-bit quantization ────────────────
+            from transformers import BitsAndBytesConfig
+
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_compute_dtype=torch.float16,
@@ -170,11 +187,22 @@ class Generator:
                 device_map="auto",
                 torch_dtype=torch.float16,
             )
+        elif DEVICE == "mps":
+            # ── Apple Silicon path: float16 on MPS ────────────────────────────
+            # bitsandbytes is not supported on MPS.
+            # Load on CPU first then move to MPS — loading directly onto MPS
+            # can segfault on some PyTorch versions due to a Metal memory bug.
+            self.model = AutoModelForCausalLM.from_pretrained(
+                LLM_MODEL_NAME,
+                torch_dtype=torch.float16,
+                low_cpu_mem_usage=True,
+            ).to("mps")
         else:
+            # ── CPU fallback: float32 ─────────────────────────────────────────
             self.model = AutoModelForCausalLM.from_pretrained(
                 LLM_MODEL_NAME,
                 device_map="auto",
-                torch_dtype=torch.float16,
+                torch_dtype=torch.float32,
             )
 
         # Set pad token if not set

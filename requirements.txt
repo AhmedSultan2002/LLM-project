@@ -1,7 +1,17 @@
 # Core ML dependencies
-# Note: Install PyTorch separately with CUDA support first:
+#
+# ── NVIDIA GPU (Linux/Windows) ─────────────────────────────────────────────────
+# Install PyTorch with CUDA 12.4 support first:
 #   pip install torch==2.5.1+cu124 torchvision==0.20.1+cu124 torchaudio==2.5.1+cu124 \
 #       --index-url https://download.pytorch.org/whl/cu124
+#
+# ── Apple Silicon (macOS) ──────────────────────────────────────────────────────
+# Install the standard PyTorch wheel (MPS backend is included):
+#   pip install torch==2.5.1
+# bitsandbytes is NOT required on macOS; the pipeline falls back to float16 on MPS.
+# If you still want to install it (e.g. for a multi-platform repo), use:
+#   pip install bitsandbytes==0.45.0
+# Note: bitsandbytes has no CUDA dependency on macOS but also provides no speedup.
 torch==2.5.1
 transformers==4.46.3
 sentence-transformers==3.3.1
@@ -9,7 +19,9 @@ faiss-cpu==1.9.0
 openpyxl==3.1.5
 numpy==1.26.4
 accelerate==1.2.1
-bitsandbytes==0.42.0
+# bitsandbytes: required only on CUDA (NVIDIA GPU) for 4-bit NF4 quantization.
+# Safe to omit on macOS / CPU-only machines.
+bitsandbytes==0.45.0
 
 # Dev / testing dependencies
 pytest==8.3.4
