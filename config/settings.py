@@ -29,7 +29,38 @@ LLM_TEMPERATURE = 0.3
 LLM_TOP_P = 0.9
 LLM_REPETITION_PENALTY = 1.1
 LLM_MAX_INPUT_LENGTH = 2048  # Tokenizer truncation limit
-LLM_USE_4BIT = True  # 4-bit quantization for RTX 4060 (8GB VRAM)
+LLM_USE_4BIT = (
+    True  # Enable quantization where supported (CUDA only; ignored on MPS/CPU)
+)
+
+
+# ─── Hardware / Platform Detection ────────────────────────────────────────────
+def _detect_device() -> str:
+    """
+    Detect the best available compute device.
+
+    Returns one of:
+        "cuda"  – NVIDIA GPU with CUDA support
+        "mps"   – Apple Silicon GPU (Metal Performance Shaders)
+        "cpu"   – fallback
+    """
+    try:
+        import torch
+
+        if torch.cuda.is_available():
+            return "cuda"
+        if torch.backends.mps.is_available():
+            return "mps"
+    except ImportError:
+        pass
+    return "cpu"
+
+
+DEVICE = _detect_device()
+
+# bitsandbytes NF4 quantization only works on CUDA.
+# On MPS/CPU we disable it automatically regardless of LLM_USE_4BIT.
+QUANTIZATION_ENABLED = LLM_USE_4BIT and (DEVICE == "cuda")
 
 # ─── RAG ──────────────────────────────────────────────────────────────────────
 RAG_TOP_K = 3  # Number of retrieved chunks for context

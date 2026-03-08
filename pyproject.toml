@@ -15,10 +15,14 @@ dependencies = [
     "openpyxl==3.1.5",
     "numpy==1.26.4",
     "accelerate==1.2.1",
-    "bitsandbytes==0.45.0",
+    # bitsandbytes is only needed on CUDA (NVIDIA GPU) for 4-bit NF4 quantization.
+    # Install it via: pip install nust-bank-rag[cuda]
+    # It is safe to omit on macOS / CPU-only machines.
 ]
 
 [project.optional-dependencies]
+# NVIDIA GPU: enables bitsandbytes 4-bit NF4 quantization
+cuda = ["bitsandbytes==0.45.0"]
 dev = ["pytest==8.3.4"]
 
 [tool.setuptools.packages.find]
