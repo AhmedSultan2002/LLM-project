@@ -28,35 +28,55 @@ User Query
           ▼
 ┌─────────────────────┐
 │   Llama 3.2 (3B)     │  ──→  Generated Response
-│  (4-bit quantized)   │
+│  CUDA: 4-bit NF4     │
+│  MPS:  float16       │
 └─────────────────────┘
 ```
 
 ## Setup
 
 ### Prerequisites
-- Python 3.10+
-- NVIDIA GPU with ≥6GB VRAM (for 4-bit quantized Llama 3.2 3B)
-- CUDA toolkit
+- Python 3.10
+- conda (recommended for environment management)
+- **NVIDIA GPU** with ≥6 GB VRAM — runs with 4-bit NF4 quantization (bitsandbytes)
+- **OR Apple Silicon Mac** (M1/M2/M3) — runs in float16 on MPS, no quantization library needed
 
 ### Installation
 
-1. **Install PyTorch with CUDA support** (Important for Windows compatibility):
+1. **Create and activate a conda environment**:
    ```bash
-   pip install torch==2.5.1+cu124 torchvision==0.20.1+cu124 torchaudio==2.5.1+cu124 --index-url https://download.pytorch.org/whl/cu124
+   conda create -n nust-bank python=3.10 -y
+   conda activate nust-bank
    ```
 
-2. **Install other dependencies**:
+2. **Install PyTorch**:
+
+   - **NVIDIA GPU (CUDA 12.4)**:
+     ```bash
+     pip install torch==2.5.1+cu124 torchvision==0.20.1+cu124 torchaudio==2.5.1+cu124 \
+         --index-url https://download.pytorch.org/whl/cu124
+     ```
+   - **Apple Silicon / CPU**:
+     ```bash
+     pip install torch==2.5.1
+     ```
+
+3. **Install project dependencies**:
    ```bash
    pip install -r requirements.txt
+   pip install -e .
+   ```
+
+4. **NVIDIA only — install bitsandbytes for 4-bit quantization**:
+   ```bash
+   pip install bitsandbytes==0.45.0
    ```
 
 ### Hugging Face Access
-Llama 3.2 requires access approval. Make sure you:
+Llama 3.2 is a gated model. You must:
 1. Accept the license at https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct
-2. Log in to your terminal using your Hugging Face access token:
+2. Authenticate in your terminal:
    ```bash
-   # Use this python script to avoid PATH issues on Windows
    python -c "from huggingface_hub import login; login()"
    ```
 
@@ -83,6 +103,10 @@ python src/rag_pipeline.py
 python src/rag_pipeline.py --query "What is the daily transfer limit?"
 ```
 
+> **Note (macOS):** Do not run via `conda run` — it causes a segfault on macOS due to
+> process isolation. Always activate the environment first (`conda activate nust-bank`)
+> and run with `python` directly.
+
 > **Note:** The interactive mode is **stateless** — each question is processed independently
 > with no memory of previous turns. Follow-up questions like "tell me more about that"
 > will not work as expected. Each question should be self-contained.
@@ -108,14 +132,15 @@ python src/rag_pipeline.py --query "What is the daily transfer limit?"
 
 ## Tech Stack
 
-| Component       | Technology                          |
-|----------------|-------------------------------------|
-| LLM            | Llama 3.2 3B Instruct (4-bit)     |
-| Embeddings     | all-MiniLM-L6-v2 (384-dim)        |
-| Vector Store   | FAISS (IndexFlatIP)               |
-| Quantization   | bitsandbytes (NF4)                |
-| Language       | Python 3.10                        |
+| Component       | Technology                                        |
+|----------------|---------------------------------------------------|
+| LLM            | Llama 3.2 3B Instruct                            |
+| Embeddings     | all-MiniLM-L6-v2 (384-dim)                       |
+| Vector Store   | FAISS (IndexFlatIP)                              |
+| Quantization   | bitsandbytes NF4 (CUDA only) / float16 (MPS)    |
+| Language       | Python 3.10                                       |
 
 ## Team
 - Ahmed Sultan
 - Muhammad Saad Ashraf
+
