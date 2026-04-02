@@ -1,6 +1,6 @@
 # NUST Bank Customer Service Assistant
 
-An intelligent customer service chatbot for NUST Bank, powered by **Llama 3.2** with **Retrieval-Augmented Generation (RAG)**.
+An intelligent customer service chatbot for NUST Bank, powered by **Llama 3.2** (fine-tuned with **QLoRA**) and **Retrieval-Augmented Generation (RAG)**.
 
 ## Architecture
 
@@ -43,13 +43,16 @@ User Query
 
 ### Installation
 
-1. **Create and activate a conda environment**:
+1. **Create and activate a virtual environment**:
    ```bash
-   conda create -n nust-bank python=3.10 -y
-   conda activate nust-bank
+   python -m venv venv
+   # Windows
+   .\venv\Scripts\Activate.ps1
+   # macOS/Linux
+   source venv/bin/activate
    ```
 
-2. **Install PyTorch**:
+2. **Install PyTorch with CUDA support** (must be done separately as it is not in `requirements.txt`):
 
    - **NVIDIA GPU (CUDA 12.4)**:
      ```bash
@@ -64,12 +67,6 @@ User Query
 3. **Install project dependencies**:
    ```bash
    pip install -r requirements.txt
-   pip install -e .
-   ```
-
-4. **NVIDIA only — install bitsandbytes for 4-bit quantization**:
-   ```bash
-   pip install bitsandbytes==0.45.0
    ```
 
 ### Hugging Face Access
@@ -94,7 +91,20 @@ python src/build_index.py
 ```
 Generates embeddings and builds the FAISS similarity search index.
 
-### Step 3: Run the Assistant
+### Step 3: Generate Fine-Tuning Dataset
+```bash
+python src/generate_finetune_data.py
+```
+Converts the processed Q&A corpus into Llama 3 chat template format. Output: `data/finetune_dataset.json`.
+
+### Step 4: Fine-Tune the Model (QLoRA)
+```bash
+python src/finetune.py
+```
+Fine-tunes Llama 3.2 3B using 4-bit QLoRA on the generated dataset (~10 min on RTX 4060).
+The LoRA adapter weights are saved to `data/lora-nust-bank/`. The RAG pipeline will automatically load these adapters if they exist.
+
+### Step 5: Run the Assistant
 ```bash
 # Interactive mode
 python src/rag_pipeline.py
@@ -103,27 +113,26 @@ python src/rag_pipeline.py
 python src/rag_pipeline.py --query "What is the daily transfer limit?"
 ```
 
-> **Note (macOS):** Do not run via `conda run` — it causes a segfault on macOS due to
-> process isolation. Always activate the environment first (`conda activate nust-bank`)
-> and run with `python` directly.
-
 > **Note:** The interactive mode is **stateless** — each question is processed independently
-> with no memory of previous turns. Follow-up questions like "tell me more about that"
-> will not work as expected. Each question should be self-contained.
+> with no memory of previous turns. Each question should be self-contained.
 
 ## Project Structure
 
 ```
 ├── config/
-│   └── settings.py              # Centralized configuration
+│   └── settings.py                # Centralized configuration
 ├── src/
-│   ├── data_preprocessing.py    # Excel + JSON data parsing
-│   ├── build_index.py           # Embedding generation + FAISS
-│   └── rag_pipeline.py          # RAG pipeline (retrieval + generation)
-├── data/                        # Generated data (gitignored)
+│   ├── data_preprocessing.py      # Excel + JSON data parsing
+│   ├── build_index.py             # Embedding generation + FAISS
+│   ├── generate_finetune_data.py  # Fine-tune dataset generation
+│   ├── finetune.py                # QLoRA fine-tuning script
+│   └── rag_pipeline.py            # RAG pipeline + guardrails
+├── data/                          # Generated data (gitignored)
 │   ├── processed_documents.json
 │   ├── faiss_index.bin
-│   └── doc_mapping.json
+│   ├── doc_mapping.json
+│   ├── finetune_dataset.json
+│   └── lora-nust-bank/            # Fine-tuned LoRA adapter weights
 ├── NUST Bank-Product-Knowledge.xlsx
 ├── funds_transfer_app_features_faq.json
 ├── requirements.txt
@@ -134,10 +143,11 @@ python src/rag_pipeline.py --query "What is the daily transfer limit?"
 
 | Component       | Technology                                        |
 |----------------|---------------------------------------------------|
-| LLM            | Llama 3.2 3B Instruct                            |
+| LLM            | Llama 3.2 3B Instruct (QLoRA fine-tuned)         |
+| Fine-Tuning    | PEFT / TRL SFTTrainer (4-bit QLoRA)              |
 | Embeddings     | all-MiniLM-L6-v2 (384-dim)                       |
 | Vector Store   | FAISS (IndexFlatIP)                              |
-| Quantization   | bitsandbytes NF4 (CUDA only) / float16 (MPS)    |
+| Quantization   | bitsandbytes NF4 (CUDA) / float16 (MPS)          |
 | Language       | Python 3.10                                       |
 
 ## Team
