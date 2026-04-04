@@ -1,0 +1,21 @@
+# ── Build the Frontend container ────────────────────────────────────────────
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Streamlit and dependencies
+RUN pip install --no-cache-dir streamlit==1.42.0 httpx==0.28.1
+
+# Copy frontend code
+COPY frontend/ ./frontend/
+
+# Expose Streamlit port
+EXPOSE 8501
+
+# Run Streamlit
+CMD ["streamlit", "run", "frontend/app.py", "--server.address", "0.0.0.0", "--server.port", "8501"]

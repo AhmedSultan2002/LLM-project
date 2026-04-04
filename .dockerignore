@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.git/
+.gitignore
+*.egg-info/
+venv/
+.venv/
+*.log
+.DS_Store
+LLM\ Project\ Description\ SP26-2.pdf
+Project\ Proposal\ LLM\ -\ Saad\ Ashraf\ -\ Ahmed\ Sultan.pdf
+report/
+tests/
