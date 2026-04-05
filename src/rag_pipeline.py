@@ -29,6 +29,11 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
+import sys
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from config.settings import (
     FAISS_INDEX_PATH,
     DOC_MAPPING_PATH,

@@ -83,7 +83,7 @@ def main():
         gradient_accumulation_steps=4,
         learning_rate=2e-4,
         logging_steps=10,
-        num_train_epochs=3,
+        num_train_epochs=2,
         weight_decay=0.01,
         bf16=True,
         optim="paged_adamw_8bit",

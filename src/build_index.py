@@ -15,6 +15,9 @@ import faiss
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
+import sys
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from config.settings import (
     PROCESSED_DOCS_PATH,
     FAISS_INDEX_PATH,
@@ -24,11 +27,37 @@ from config.settings import (
 )
 
 
+import re
+
+def clean_answer(answer: str) -> str:
+    """Clean numbered prefixes and leaked adjacent Q&A text."""
+    answer = re.sub(r"^\d+\.\s*", "", answer.strip())
+    leaked_pattern = re.search(r"\s+\d+\.\s+(?:Can|What|How|Is|Do|Who|Where|Which|Are)\s", answer)
+    if leaked_pattern:
+        answer = answer[:leaked_pattern.start()].strip()
+    answer = re.sub(r"^[·•\-]\s*", "", answer.strip())
+    answer = re.sub(r"\s{2,}", " ", answer)
+    if answer.endswith("/") or answer.endswith("\\"):
+        answer = answer[:-1].strip()
+    return answer.strip()
+
+def clean_question(question: str) -> str:
+    """Remove numbered prefixes from questions."""
+    return re.sub(r"^\d+\.\s*", "", question.strip())
+
 def load_documents(path: str) -> list[dict]:
-    """Load the processed document corpus."""
+    """Load the processed document corpus and clean it."""
     try:
         with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+            docs = json.load(f)
+            
+        for doc in docs:
+            doc["question"] = clean_question(doc["question"])
+            doc["answer"] = clean_answer(doc["answer"])
+            # Rebuild the embedding text with the clean data
+            doc["text"] = f"{doc['product']} - {doc['question']} {doc['answer']}"
+            
+        return docs
     except FileNotFoundError:
         raise FileNotFoundError(
             f"Processed corpus not found at '{path}'.\n"
