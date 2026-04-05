@@ -83,34 +83,38 @@ Llama 3.2 is a gated model. You must:
 ```bash
 python src/data_preprocessing.py
 ```
-Parses the NUST Bank Excel workbook and JSON FAQ into a cleaned document corpus.
+Parses the raw NUST Bank Excel workbook and JSON FAQ into a structured document corpus.
 
 ### Step 2: Build Vector Index
 ```bash
 python src/build_index.py
 ```
-Generates embeddings and builds the FAISS similarity search index.
+Applies regex cleaning to remove Excel artifacts (like numbered lists or leaked adjacent text), generates sentence embeddings using `sentence-transformers`, and builds the FAISS similarity search index for clean RAG retrieval.
 
 ### Step 3: Generate Fine-Tuning Dataset
 ```bash
 python src/generate_finetune_data.py
 ```
-Converts the processed Q&A corpus into Llama 3 chat template format. Output: `data/finetune_dataset.json`.
+Generates a highly optimized fine-tuning dataset (960+ examples) by:
+- Cleaning raw answers from the initial data extraction.
+- Wrapping raw facts into professional, conversational customer service replies.
+- Multiplying records with exact match, paraphrased variants, out-of-scope rejection examples, and strict system prompt guardrails.
+Output: `data/finetune_dataset.json`.
 
 ### Step 4: Fine-Tune the Model (QLoRA)
 ```bash
 python src/finetune.py
 ```
-Fine-tunes Llama 3.2 3B using 4-bit QLoRA on the generated dataset (~10 min on RTX 4060).
-The LoRA adapter weights are saved to `data/lora-nust-bank/`. The RAG pipeline will automatically load these adapters if they exist.
+Fine-tunes Llama 3.2 3B using 4-bit QLoRA on the generated dataset (~15-20 min on an RTX 4060). The script sets memory-safe hyperparameters (`epochs=2`, `batch_size=1`, `max_length=512`) to prevent systemic RAM exhaustion and model overfitting.
+The LoRA adapter weights are automatically generated and saved to `data/lora-nust-bank/`.
 
 ### Step 5: Run the Assistant
 ```bash
 # Interactive mode
 python src/rag_pipeline.py
 
-# Single query
-python src/rag_pipeline.py --query "What is the daily transfer limit?"
+# Single test query
+python src/rag_pipeline.py --query "can I get a loan for a car?"
 ```
 
 > **Note:** The interactive mode is **stateless** — each question is processed independently

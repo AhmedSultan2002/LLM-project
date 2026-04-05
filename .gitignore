@@ -23,11 +23,8 @@ Desktop.ini
 .DS_Store
 
 # Project-specific generated data (rebuild with src/build_index.py)
-data/faiss_index.bin
 data/doc_mapping.json
 data/processed_documents.json
-data/finetune_dataset.json
-data/lora-nust-bank/
 
 # Temporary / scratch files
 read_excel.py
