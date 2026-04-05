@@ -1,6 +1,8 @@
 """API routes for NUST Bank RAG service."""
 
-from fastapi import APIRouter, HTTPException
+import json
+
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse
 
 from .models import (
@@ -11,6 +13,8 @@ from .models import (
     SourceInfo,
     AddDocumentRequest,
     AddDocumentResponse,
+    BulkFAQDocument,
+    BulkUploadResponse,
 )
 from .service import get_service
 
@@ -81,5 +85,78 @@ async def add_document(request: AddDocumentRequest):
             answer=request.answer,
         )
         return AddDocumentResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/documents/bulk", response_model=BulkUploadResponse)
+async def bulk_add_documents(document: BulkFAQDocument):
+    """
+    Add multiple FAQ entries from a structured JSON body.
+
+    Expected format:
+    ```json
+    {
+      "categories": [
+        {
+          "category": "Product Name",
+          "questions": [
+            {"question": "...", "answer": "..."}
+          ]
+        }
+      ]
+    }
+    ```
+    """
+    try:
+        service = get_service()
+        categories = [cat.model_dump() for cat in document.categories]
+        result = service.add_documents_bulk(categories)
+        return BulkUploadResponse(**result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/documents/bulk/upload", response_model=BulkUploadResponse)
+async def bulk_upload_faq_file(file: UploadFile = File(...)):
+    """
+    Upload a JSON file containing FAQ entries and add them to the knowledge base.
+
+    The file must follow the format:
+    ```json
+    {
+      "categories": [
+        {
+          "category": "Product Name",
+          "questions": [
+            {"question": "...", "answer": "..."}
+          ]
+        }
+      ]
+    }
+    ```
+    """
+    if not file.filename or not file.filename.lower().endswith(".json"):
+        raise HTTPException(status_code=400, detail="Only .json files are accepted.")
+
+    try:
+        raw = await file.read()
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON: {e}")
+
+    try:
+        document = BulkFAQDocument(**data)
+    except Exception as e:
+        raise HTTPException(
+            status_code=422,
+            detail=f"File does not match the expected FAQ schema: {e}",
+        )
+
+    try:
+        service = get_service()
+        categories = [cat.model_dump() for cat in document.categories]
+        result = service.add_documents_bulk(categories)
+        return BulkUploadResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -359,6 +359,86 @@ class RAGService:
             "total_documents": self.retriever.index.ntotal,
         }
 
+    def add_documents_bulk(self, categories: list[dict]) -> dict:
+        """
+        Add multiple Q&A documents from a structured FAQ document.
+
+        Expected format:
+          [{"category": "Product Name", "questions": [{"question": "...", "answer": "..."}]}]
+
+        Each entry is embedded and added to the live FAISS index. Both the index
+        and doc_mapping are persisted to disk after all entries are processed.
+        """
+        import faiss
+        from config.settings import PROCESSED_DOCS_PATH
+
+        added_count = 0
+        errors: list[str] = []
+
+        processed = []
+        if os.path.exists(PROCESSED_DOCS_PATH):
+            with open(PROCESSED_DOCS_PATH, "r", encoding="utf-8") as f:
+                processed = json.load(f)
+
+        for cat in categories:
+            product = cat.get("category", "").strip()
+            if not product:
+                errors.append("Skipped a category with an empty name.")
+                continue
+
+            for entry in cat.get("questions", []):
+                question = entry.get("question", "").strip()
+                answer = entry.get("answer", "").strip()
+
+                if not question or not answer:
+                    errors.append(f"[{product}] Skipped entry with missing question or answer.")
+                    continue
+
+                try:
+                    text = f"{product} - {question} {answer}"
+                    embedding = self.retriever.model.encode([text], normalize_embeddings=True)
+                    embedding = np.array(embedding, dtype="float32")
+
+                    self.retriever.index.add(embedding)
+
+                    new_id = len(self.retriever.doc_mapping)
+                    new_doc = {
+                        "id": new_id,
+                        "question": question,
+                        "answer": answer,
+                        "product": product,
+                        "source": "bulk_upload",
+                    }
+                    self.retriever.doc_mapping.append(new_doc)
+                    processed.append({**new_doc, "text": text})
+                    added_count += 1
+                    logger.info(f"Bulk added: [{product}] {question[:60]}")
+                except Exception as exc:
+                    errors.append(f"[{product}] Failed to add '{question[:60]}': {exc}")
+
+        # Persist all changes to disk in one pass
+        faiss.write_index(self.retriever.index, FAISS_INDEX_PATH)
+        with open(DOC_MAPPING_PATH, "w", encoding="utf-8") as f:
+            json.dump(self.retriever.doc_mapping, f, indent=2, ensure_ascii=False)
+        with open(PROCESSED_DOCS_PATH, "w", encoding="utf-8") as f:
+            json.dump(processed, f, indent=2, ensure_ascii=False)
+
+        success = added_count > 0
+        message = (
+            f"Bulk upload complete. Added {added_count} document(s). "
+            f"Knowledge base now contains {self.retriever.index.ntotal} documents."
+        )
+        if errors:
+            message += f" {len(errors)} entry/entries were skipped."
+
+        return {
+            "success": success,
+            "message": message,
+            "added_count": added_count,
+            "total_documents": self.retriever.index.ntotal,
+            "errors": errors,
+        }
+
 
 def get_service() -> RAGService:
     """Get the singleton RAG service instance."""

@@ -144,6 +144,20 @@ class APIClient:
         except Exception as e:
             return {"success": False, "message": str(e)}
 
+    def upload_faq_file(self, file_bytes: bytes, filename: str) -> dict:
+        """Upload a JSON FAQ file to bulk-add documents to the knowledge base."""
+        try:
+            response = self.client.post(
+                f"{self.base_url}/documents/bulk/upload",
+                files={"file": (filename, file_bytes, "application/json")},
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            return {"success": False, "message": f"HTTP {e.response.status_code}: {e.response.text}"}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
 
 # ─── UI Components ───────────────────────────────────────────────────────────
 def show_header():
@@ -216,6 +230,49 @@ def show_sidebar():
                     st.success(result.get("message", "Document added."))
                 else:
                     st.error(result.get("message", "Failed to add document."))
+
+        st.divider()
+
+        st.header("📂 Bulk FAQ Upload")
+        st.caption(
+            "Upload a JSON file containing multiple FAQs to add them all at once. "
+            "The file must follow this format:"
+        )
+        st.code(
+            '{\n'
+            '  "categories": [\n'
+            '    {\n'
+            '      "category": "Product Name",\n'
+            '      "questions": [\n'
+            '        {"question": "...", "answer": "..."}\n'
+            '      ]\n'
+            '    }\n'
+            '  ]\n'
+            '}',
+            language="json",
+        )
+        uploaded_file = st.file_uploader(
+            "Choose a JSON file",
+            type=["json"],
+            key="faq_uploader",
+            help="JSON file with categories and questions following the format above.",
+        )
+        if uploaded_file is not None:
+            if st.button("⬆️ Upload & Add to Knowledge Base"):
+                client = APIClient()
+                with st.spinner("Uploading and indexing FAQs..."):
+                    result = client.upload_faq_file(uploaded_file.getvalue(), uploaded_file.name)
+                if result.get("success"):
+                    st.success(
+                        f"{result.get('message', 'Upload complete.')} "
+                        f"({result.get('added_count', 0)} entries added)"
+                    )
+                    if result.get("errors"):
+                        with st.expander("⚠️ Skipped entries"):
+                            for err in result["errors"]:
+                                st.warning(err)
+                else:
+                    st.error(result.get("message", "Upload failed."))
 
         st.divider()
 

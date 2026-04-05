@@ -2196,5 +2196,103 @@
     "answer": "Currently, the NUST mobile app supports English only. Multilingual support is being considered for future updates.",
     "product": "Mobile App — App Features / Functionalities",
     "source": "json:funds_transfer_faq"
+  },
+  {
+    "id": 314,
+    "question": "What is the maximum loan tenure",
+    "answer": "The maximum tenure is 20 years",
+    "product": "Home Loan",
+    "source": "user_upload"
+  },
+  {
+    "id": 315,
+    "question": "What is the maximum loan tenure?",
+    "answer": "The maximum tenure is 20 years",
+    "product": "Home Loan",
+    "source": "user_upload"
+  },
+  {
+    "id": 316,
+    "question": "How do I enable two-factor authentication on my NUST Bank internet banking account?",
+    "answer": "Log in to NUST Bank internet banking, go to Security Settings, and enable Two-Factor Authentication (2FA). You will receive a one-time password (OTP) on your registered mobile number every time you log in. For assistance call +92 (51) 111 000 494.",
+    "product": "Internet Banking Security",
+    "source": "bulk_upload"
+  },
+  {
+    "id": 317,
+    "question": "What should I do if I suspect unauthorized access to my NUST Bank internet banking account?",
+    "answer": "Immediately change your internet banking password via the login page using the 'Forgot Password' option, then call the 24/7 helpline at +92 (51) 111 000 494 to report the incident and temporarily freeze your account if necessary.",
+    "product": "Internet Banking Security",
+    "source": "bulk_upload"
+  },
+  {
+    "id": 318,
+    "question": "How often should I change my NUST Bank internet banking password?",
+    "answer": "NUST Bank recommends changing your internet banking password every 90 days. The system will prompt you automatically. Ensure your password is at least 8 characters and includes a mix of letters, numbers, and special characters.",
+    "product": "Internet Banking Security",
+    "source": "bulk_upload"
+  },
+  {
+    "id": 319,
+    "question": "How can I request a new cheque book from NUST Bank?",
+    "answer": "You can request a cheque book through the NUST Bank mobile app under Services > Cheque Book Request, via internet banking, or by submitting a written request at your home branch. The cheque book is delivered to your registered address within 7 to 10 working days.",
+    "product": "Cheque Book Services",
+    "source": "bulk_upload"
+  },
+  {
+    "id": 320,
+    "question": "What should I do if my NUST Bank cheque book is lost or stolen?",
+    "answer": "Report the loss immediately by calling +92 (51) 111 000 494 or visiting your nearest branch. You will need to submit a Stop Payment request for any unused cheques and file an FIR. A replacement cheque book can then be issued upon request.",
+    "product": "Cheque Book Services",
+    "source": "bulk_upload"
+  },
+  {
+    "id": 321,
+    "question": "Is there a fee for a NUST Bank cheque book?",
+    "answer": "The first cheque book (25 leaves) is complimentary for eligible account types. Subsequent cheque books are charged as per NUST Bank's current Schedule of Bank Charges, which is available on the bank's website or at any branch.",
+    "product": "Cheque Book Services",
+    "source": "bulk_upload"
+  },
+  {
+    "id": 322,
+    "question": "How can I download my NUST Bank account statement?",
+    "answer": "Log in to NUST Bank internet banking or the mobile app, navigate to Accounts > Statement, select the date range, and download the PDF. Statements can also be requested at any branch or emailed to your registered email address.",
+    "product": "Account Statements",
+    "source": "bulk_upload"
+  },
+  {
+    "id": 323,
+    "question": "How far back can I retrieve my NUST Bank account statement?",
+    "answer": "Through internet banking and the mobile app you can access up to 12 months of transaction history. For statements older than 12 months, submit a written request at your home branch. Charges may apply as per the Schedule of Bank Charges.",
+    "product": "Account Statements",
+    "source": "bulk_upload"
+  },
+  {
+    "id": 324,
+    "question": "Can I get a certified account statement from NUST Bank for visa or loan purposes?",
+    "answer": "Yes. Visit your home branch with a written application specifying the purpose and required period. A certified/stamped bank statement is typically ready within 2 to 3 working days. A nominal fee may apply.",
+    "product": "Account Statements",
+    "source": "bulk_upload"
+  },
+  {
+    "id": 325,
+    "question": "How can I find the nearest NUST Bank branch or ATM?",
+    "answer": "Use the Branch/ATM Locator feature in the NUST Bank mobile app or visit the official website and navigate to Branch Network. You can search by city or area to find the closest branch or ATM along with its operating hours.",
+    "product": "Branch & Contact Services",
+    "source": "bulk_upload"
+  },
+  {
+    "id": 326,
+    "question": "What are the general operating hours of NUST Bank branches?",
+    "answer": "Most NUST Bank branches operate Monday to Friday from 9:00 AM to 5:00 PM. Saturday hours may vary by branch. The 24/7 customer support helpline is available at +92 (51) 111 000 494 outside branch hours.",
+    "product": "Branch & Contact Services",
+    "source": "bulk_upload"
+  },
+  {
+    "id": 327,
+    "question": "How do I file a formal complaint with NUST Bank?",
+    "answer": "You can file a complaint through the NUST Bank mobile app under Contact Us > Complaint, via email at complaints@nustbank.com.pk, by calling +92 (51) 111 000 494, or by submitting a written complaint at any branch. NUST Bank is required to resolve complaints within 10 working days as per SBP guidelines.",
+    "product": "Branch & Contact Services",
+    "source": "bulk_upload"
   }
 ]
