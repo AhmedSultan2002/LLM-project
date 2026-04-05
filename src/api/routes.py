@@ -9,6 +9,8 @@ from .models import (
     HealthResponse,
     SourceListResponse,
     SourceInfo,
+    AddDocumentRequest,
+    AddDocumentResponse,
 )
 from .service import get_service
 
@@ -64,5 +66,20 @@ async def get_sources():
         service = get_service()
         sources = service.get_sources()
         return SourceListResponse(sources=sources, total_count=len(sources))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/documents", response_model=AddDocumentResponse)
+async def add_document(request: AddDocumentRequest):
+    """Add a new Q&A document to the live knowledge base."""
+    try:
+        service = get_service()
+        result = service.add_document(
+            product=request.product,
+            question=request.question,
+            answer=request.answer,
+        )
+        return AddDocumentResponse(**result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

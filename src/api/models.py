@@ -39,3 +39,19 @@ class SourceListResponse(BaseModel):
 
     sources: list[str]
     total_count: int
+
+
+class AddDocumentRequest(BaseModel):
+    """Request model for adding a new document to the knowledge base."""
+
+    product: str = Field(..., min_length=1, max_length=200, description="Product or category name")
+    question: str = Field(..., min_length=5, max_length=1000, description="The question this document answers")
+    answer: str = Field(..., min_length=5, max_length=5000, description="The answer to the question")
+
+
+class AddDocumentResponse(BaseModel):
+    """Response after adding a new document."""
+
+    success: bool
+    message: str
+    total_documents: int

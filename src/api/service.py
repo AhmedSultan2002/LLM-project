@@ -304,6 +304,61 @@ class RAGService:
             sources.add(doc.get("product", "Unknown"))
         return sorted(sources)
 
+    def add_document(self, product: str, question: str, answer: str) -> dict:
+        """
+        Add a new Q&A document to the live FAISS index and persist it to disk.
+
+        The new document is embedded with the already-loaded SentenceTransformer,
+        added to the in-memory FAISS index, appended to the doc_mapping list, and
+        both artefacts are saved back to disk so the update survives a restart.
+        """
+        import faiss
+
+        text = f"{product} - {question} {answer}"
+
+        embedding = self.retriever.model.encode([text], normalize_embeddings=True)
+        embedding = np.array(embedding, dtype="float32")
+
+        self.retriever.index.add(embedding)
+
+        new_id = len(self.retriever.doc_mapping)
+        new_doc = {
+            "id": new_id,
+            "question": question,
+            "answer": answer,
+            "product": product,
+            "source": "user_upload",
+        }
+        self.retriever.doc_mapping.append(new_doc)
+
+        # Persist updated index and mapping to disk
+        faiss.write_index(self.retriever.index, FAISS_INDEX_PATH)
+        with open(DOC_MAPPING_PATH, "w", encoding="utf-8") as f:
+            json.dump(self.retriever.doc_mapping, f, indent=2, ensure_ascii=False)
+
+        # Also append to the processed documents corpus so it survives a full re-index
+        from config.settings import PROCESSED_DOCS_PATH
+        processed = []
+        if os.path.exists(PROCESSED_DOCS_PATH):
+            with open(PROCESSED_DOCS_PATH, "r", encoding="utf-8") as f:
+                processed = json.load(f)
+        processed.append({
+            "question": question,
+            "answer": answer,
+            "product": product,
+            "source": "user_upload",
+            "text": text,
+        })
+        with open(PROCESSED_DOCS_PATH, "w", encoding="utf-8") as f:
+            json.dump(processed, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"New document added: [{product}] {question[:60]}")
+        return {
+            "success": True,
+            "message": f"Document added successfully. Knowledge base now contains {self.retriever.index.ntotal} documents.",
+            "total_documents": self.retriever.index.ntotal,
+        }
+
 
 def get_service() -> RAGService:
     """Get the singleton RAG service instance."""

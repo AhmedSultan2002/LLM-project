@@ -130,6 +130,20 @@ class APIClient:
         except Exception as e:
             return []
 
+    def add_document(self, product: str, question: str, answer: str) -> dict:
+        """Add a new document to the knowledge base."""
+        try:
+            response = self.client.post(
+                f"{self.base_url}/documents",
+                json={"product": product, "question": question, "answer": answer},
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPStatusError as e:
+            return {"success": False, "message": f"HTTP {e.response.status_code}: {e.response.text}"}
+        except Exception as e:
+            return {"success": False, "message": str(e)}
+
 
 # ─── UI Components ───────────────────────────────────────────────────────────
 def show_header():
@@ -181,6 +195,27 @@ def show_sidebar():
         if st.button("🗑️ Clear Chat History"):
             st.session_state.messages = []
             st.rerun()
+
+        st.divider()
+
+        st.header("📄 Add New Document")
+        st.caption("Add a new Q&A entry to the live knowledge base.")
+        with st.form("add_doc_form", clear_on_submit=True):
+            new_product = st.text_input("Product / Category", placeholder="e.g. Home Loan")
+            new_question = st.text_area("Question", placeholder="e.g. What is the maximum loan tenure?", height=80)
+            new_answer = st.text_area("Answer", placeholder="The maximum tenure is 20 years...", height=120)
+            submitted = st.form_submit_button("➕ Add to Knowledge Base")
+
+        if submitted:
+            if not new_product or not new_question or not new_answer:
+                st.error("All three fields are required.")
+            else:
+                client = APIClient()
+                result = client.add_document(new_product, new_question, new_answer)
+                if result.get("success"):
+                    st.success(result.get("message", "Document added."))
+                else:
+                    st.error(result.get("message", "Failed to add document."))
 
         st.divider()
 

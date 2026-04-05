@@ -1,0 +1,550 @@
+\documentclass[12pt,a4paper]{article}
+
+% ─── Packages ────────────────────────────────────────────────────────────────
+\usepackage[margin=2.5cm, headheight=14pt]{geometry}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{amsmath}
+\usepackage{parskip}
+\usepackage{titlesec}
+\usepackage{fancyhdr}
+\usepackage{microtype}
+
+% ─── Colours ─────────────────────────────────────────────────────────────────
+\definecolor{codeblue}{rgb}{0.13,0.29,0.53}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codegreen}{rgb}{0.0,0.5,0.0}
+\definecolor{backcolour}{rgb}{0.97,0.97,0.97}
+\definecolor{nustblue}{RGB}{0,62,126}
+
+% ─── Code listing style ───────────────────────────────────────────────────────
+\lstdefinestyle{pythonstyle}{
+  backgroundcolor=\color{backcolour},
+  commentstyle=\color{codegreen},
+  keywordstyle=\color{codeblue},
+  numberstyle=\tiny\color{codegray},
+  stringstyle=\color{orange},
+  basicstyle=\ttfamily\footnotesize,
+  breakatwhitespace=false,
+  breaklines=true,
+  captionpos=b,
+  keepspaces=true,
+  numbers=left,
+  numbersep=5pt,
+  showspaces=false,
+  showstringspaces=false,
+  showtabs=false,
+  tabsize=4,
+  language=Python
+}
+\lstset{style=pythonstyle}
+
+% ─── Section formatting ───────────────────────────────────────────────────────
+\titleformat{\section}{\large\bfseries\color{nustblue}}{{\thesection}}{1em}{}[\titlerule]
+\titleformat{\subsection}{\normalsize\bfseries}{{\thesubsection}}{1em}{}
+
+% ─── Header / footer ─────────────────────────────────────────────────────────
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small CS416 — Large Language Models, Spring 2026}
+\rhead{\small NUST Bank Customer Service Assistant}
+\cfoot{\thepage}
+
+% ─── Hyperlink colours ────────────────────────────────────────────────────────
+\hypersetup{
+  colorlinks=true,
+  linkcolor=nustblue,
+  urlcolor=nustblue,
+  citecolor=nustblue
+}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{document}
+
+% ─── Title page ───────────────────────────────────────────────────────────────
+\begin{titlepage}
+  \centering
+  \vspace*{1cm}
+  \includegraphics[width=0.25\textwidth]{nust_logo.png}\\[0.8cm]
+  {\Large\bfseries National University of Sciences and Technology\\[0.3em]
+  School of Electrical Engineering and Computer Science\par}
+  \vspace{0.8cm}
+  \rule{\linewidth}{1pt}\\[0.5em]
+  {\LARGE\bfseries\color{nustblue}
+    NUST Bank Customer Service Assistant\\[0.3em]
+    A Fine-Tuned RAG Chatbot with Web Interface\par}
+  \rule{\linewidth}{1pt}\\[1cm]
+
+  {\large\bfseries CS416: Large Language Models\\[0.3em]
+  Phase 2 Report — Complete Submission\par}
+  \vspace{0.5cm}
+  {\large Submitted: 5th April 2026\par}
+  \vspace{1.5cm}
+
+  \begin{tabular}{ll}
+    \textbf{Team:}        & Ahmed Sultan \\
+                          & Muhammad Saad Ashraf  \\
+    \textbf{Class:}       & BESE-13      \\
+    \textbf{Instructor:}  & Prof.\ Dr.\ Faisal Shafait / Dr.\ Momina Moetesum / Iram Tariq \\
+  \end{tabular}
+
+  \vfill
+\end{titlepage}
+
+% ─── Table of contents ────────────────────────────────────────────────────────
+\tableofcontents
+\newpage
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Introduction}
+
+Phase~1 established a working Retrieval-Augmented Generation (RAG) prototype for
+NUST Bank's customer service chatbot.  The system could ingest 314 domain-specific
+Q\&A documents, embed them with \texttt{all-MiniLM-L6-v2}, and answer customer
+queries using Llama~3.2 3B Instruct via a command-line interface.
+
+Phase~2 extends that foundation across every dimension required for a production-
+ready deployment:
+
+\begin{itemize}
+  \item \textbf{QLoRA Fine-Tuning}: the base Llama~3.2 3B model is domain-adapted
+        using Parameter-Efficient Fine-Tuning (PEFT) with 4-bit quantisation,
+        substantially improving the quality and tone of banking responses.
+  \item \textbf{Guard Rails}: a two-layer safety mechanism (keyword pre-filter +
+        system-prompt constraints) blocks jailbreak attempts, prompt injection,
+        and off-topic queries.
+  \item \textbf{REST API}: a FastAPI service exposes the RAG pipeline over HTTP,
+        decoupling the heavy model from the user-facing layer.
+  \item \textbf{Streamlit Web Interface}: a polished, browser-based chat UI that
+        displays responses, source attribution, and latency metrics.
+  \item \textbf{Docker Compose}: a single command brings up the entire stack
+        (API + frontend) in reproducible containers.
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{System Architecture}
+
+\subsection{High-Level Overview}
+
+The Phase~2 system is composed of four loosely coupled layers:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Data Layer}: pre-processed document corpus, FAISS index, and
+        fine-tuned LoRA adapter weights stored on disk.
+  \item \textbf{Backend (FastAPI)}: loads the RAG pipeline (retriever + fine-tuned
+        LLM) lazily and exposes it via a versioned REST API.
+  \item \textbf{Frontend (Streamlit)}: a browser chat interface that communicates
+        with the backend over HTTP.
+  \item \textbf{Infrastructure (Docker Compose)}: orchestrates both services in
+        reproducible containers with GPU pass-through for the API.
+\end{enumerate}
+
+\subsection{End-to-End Data Flow}
+
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  Stage & Input & Output \\
+  \midrule
+  Preprocessing       & Excel + JSON              & 314-doc JSON corpus \\
+  Embedding           & Text corpus               & $314 \times 384$ float32 array \\
+  Indexing            & Embeddings                & \texttt{faiss\_index.bin} + mapping \\
+  Fine-tune data gen  & Processed corpus          & 960+ training examples (JSONL) \\
+  QLoRA Fine-tuning   & Base Llama 3.2 3B         & LoRA adapter weights \\
+  Guard Rails (pre)   & User query                & Blocked / allowed \\
+  Retrieval           & Allowed query             & Top-3 documents + cosine scores \\
+  Generation          & Query + docs + LoRA LLM   & Natural-language answer \\
+  API response        & Answer + sources          & JSON (query, answer, sources, latency) \\
+  UI render           & JSON response             & Chat bubble + collapsible sources \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Component Breakdown}
+
+\subsubsection{Data Ingestion (\texttt{src/data\_preprocessing.py})}
+
+Unchanged from Phase~1.  The Excel workbook (35 product sheets) and JSON FAQ
+(15 entries) are parsed, deduplicated by (question, product) key, and stored as a
+314-document JSON corpus.  Each document carries \texttt{question}, \texttt{answer},
+\texttt{product}, \texttt{source}, and a combined \texttt{text} chunk.
+
+\subsubsection{Embedding and Indexing (\texttt{src/build\_index.py})}
+
+An additional regex-cleaning pass was introduced for Phase~2 to strip Excel
+artefacts (numbered prefixes, leaked adjacent Q\&A rows) before embedding.
+Documents are encoded by \textbf{all-MiniLM-L6-v2}~\cite{reimers2019sentencebert}
+into 384-dimensional unit-$\ell_2$-normalised vectors, stored in a
+\textbf{FAISS IndexFlatIP}.
+
+\subsubsection{Fine-Tuning Dataset Generation (\texttt{src/generate\_finetune\_data.py})}
+
+A custom dataset generator produces \textbf{960+ training examples} from the
+314-document corpus.  For each document, three example types are generated:
+
+\begin{itemize}
+  \item \textbf{Exact-match positive}: the verbatim question paired with a
+        cleaned, conversational answer that adds product context and proper
+        punctuation.
+  \item \textbf{Paraphrase positive}: a syntactically varied version of the
+        question (using eight paraphrase pattern pairs) mapped to the same
+        answer, improving generalisation to novel phrasings.
+  \item \textbf{Not-found negative}: a plausible but unanswerable banking query
+        (e.g.\ ``What is the interest rate for \{product\}?'') paired with the
+        standard helpline redirect, teaching the model graceful fallback.
+\end{itemize}
+
+Additionally, 20 out-of-scope examples (weather, sports, programming, crypto,
+social media, etc.) are included to reinforce domain boundaries.
+
+All training examples use the \textbf{same strict system prompt} as the inference
+pipeline, ensuring the model never encounters a distribution shift between training
+and deployment.
+
+\subsubsection{QLoRA Fine-Tuning (\texttt{src/finetune.py})}
+
+The base \textbf{Llama~3.2 3B Instruct} model is fine-tuned using
+\textbf{Parameter-Efficient Fine-Tuning (PEFT)} with \textbf{4-bit NF4 QLoRA}
+\cite{dettmers2023qlora}.  Key configuration choices:
+
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  Hyperparameter & Value & Rationale \\
+  \midrule
+  LoRA rank ($r$)            & 16      & Balance between capacity and parameter count \\
+  LoRA alpha ($\alpha$)      & 32      & Effective learning rate scale ($\alpha/r = 2$) \\
+  LoRA dropout               & 0.05    & Light regularisation for a small dataset \\
+  Target modules             & all projection layers & Full attention + FFN adaptation \\
+  Learning rate              & $2 \times 10^{-4}$ & Standard for QLoRA fine-tuning \\
+  Batch size (per device)    & 2       & Memory-safe for 8~GB VRAM \\
+  Gradient accumulation      & 4       & Effective batch size = 8 \\
+  Epochs                     & 2       & Avoids overfitting on 960 examples \\
+  Max sequence length        & 1024    & Covers full prompt + response \\
+  Optimiser                  & \texttt{paged\_adamw\_8bit} & Reduces GPU memory footprint \\
+  Precision                  & BF16    & Stable training on Ampere+ GPUs \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+The adapter is trained on an NVIDIA RTX~4060 (8~GB VRAM) in approximately
+15--20 minutes.  The resulting LoRA weights are saved to
+\texttt{data/lora-nust-bank/} and automatically loaded by the inference pipeline
+at startup.
+
+\subsubsection{Guard Rails (\texttt{RAGPipeline.validate\_query})}
+
+A two-layer defence protects the system from adversarial inputs:
+
+\begin{enumerate}[leftmargin=2em]
+  \item \textbf{Pre-flight keyword filter}: blocks queries containing strings such
+        as \texttt{ignore previous instructions}, \texttt{forget everything},
+        \texttt{system prompt}, \texttt{jailbreak}, \texttt{dan},
+        \texttt{as an ai}, and \texttt{help me code}.  Blocked queries receive a
+        fixed refusal without ever reaching the LLM.
+  \item \textbf{System-prompt constraints}: the LLM's system prompt hard-codes
+        five rules — refuse off-topic queries, answer only from context, cite the
+        helpline when context is absent, never reveal system internals, and never
+        break character.  This layer is reinforced by the training distribution
+        (out-of-scope and not-found examples).
+\end{enumerate}
+
+\subsubsection{REST API (\texttt{src/api/})}
+
+A \textbf{FastAPI} application~\cite{fastapi} exposes three endpoints:
+
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  Endpoint & Method & Description \\
+  \midrule
+  \texttt{/api/v1/health}   & GET  & Liveness probe — confirms retriever is loaded \\
+  \texttt{/api/v1/query}    & POST & Submit a customer query; returns answer + sources + latency \\
+  \texttt{/api/v1/sources}  & GET  & List all unique product categories in the knowledge base \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+The service uses a \textbf{singleton pattern} with \textbf{lazy loading}: the
+embedding model and LLM are not instantiated until the first request arrives,
+keeping startup time near-zero.  Subsequent requests reuse the loaded models.
+CORS middleware is enabled for cross-origin browser access.
+
+\subsubsection{Streamlit Frontend (\texttt{frontend/app.py})}
+
+The web interface provides:
+
+\begin{itemize}
+  \item A persistent \textbf{chat history} rendered as conversational bubbles.
+  \item \textbf{Collapsible source cards} for each assistant reply, showing the
+        retrieved product name, matched question, and cosine relevance score.
+  \item A \textbf{response latency indicator} displayed below each answer.
+  \item A \textbf{sidebar} with API connection status (green / red indicator),
+        configurable API URL, session statistics, and a chat-clear button.
+  \item \textbf{Custom CSS} matching NUST Bank's professional aesthetic (blue
+        primary, card-based layout, subtle shadows).
+\end{itemize}
+
+\subsubsection{Containerisation (\texttt{docker-compose.yml})}
+
+Two Docker images are orchestrated:
+
+\begin{itemize}
+  \item \textbf{api}: built from \texttt{Dockerfile}, runs the FastAPI server on
+        port~8000, mounts \texttt{./data} for model artefacts, and reserves one
+        NVIDIA GPU via the \texttt{nvidia} device driver.
+  \item \textbf{frontend}: built from \texttt{Dockerfile.frontend}, runs Streamlit
+        on port~8501, depends on the \textbf{api} service, and receives
+        \texttt{API\_BASE\_URL} as an environment variable.
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Technology Stack}
+
+\begin{center}
+\begin{tabular}{lll}
+  \toprule
+  Component         & Technology                          & Version \\
+  \midrule
+  Language          & Python                              & 3.10    \\
+  LLM               & Llama 3.2 3B Instruct (QLoRA)      & --      \\
+  LLM framework     & Hugging Face Transformers           & 4.47.1  \\
+  Fine-tuning       & PEFT / TRL SFTTrainer               & --      \\
+  Embeddings        & all-MiniLM-L6-v2                    & --      \\
+  Vector store      & FAISS (IndexFlatIP)                 & 1.9.0   \\
+  Quantisation      & bitsandbytes (NF4, CUDA)            & 0.42.0  \\
+  Backend API       & FastAPI + Uvicorn                   & --      \\
+  Frontend          & Streamlit                           & --      \\
+  HTTP client       & httpx                               & --      \\
+  Containerisation  & Docker / Docker Compose             & --      \\
+  Data parsing      & openpyxl                            & 3.1.5   \\
+  Testing           & pytest                              & 8.3.4   \\
+  \bottomrule
+\end{tabular}
+\end{center}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Usage Instructions}
+
+\subsection{Prerequisites}
+
+\begin{itemize}
+  \item Python 3.10 (virtual environment or conda recommended)
+  \item Hugging Face account with access approved for
+        \href{https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct}{Llama 3.2 3B Instruct}
+  \item Hardware: NVIDIA GPU with $\geq$8~GB VRAM (recommended) or Apple Silicon
+        (MPS, FP16)
+  \item Docker \& Docker Compose (optional, for containerised deployment)
+\end{itemize}
+
+\subsection{Installation}
+
+\begin{lstlisting}[language=bash, caption={Environment setup}]
+# 1. Create and activate a virtual environment
+python -m venv venv
+source venv/bin/activate          # macOS/Linux
+# .\venv\Scripts\Activate.ps1    # Windows
+
+# 2. (NVIDIA GPU) Install PyTorch with CUDA
+pip install torch==2.5.1+cu124 torchvision==0.20.1+cu124 torchaudio==2.5.1+cu124 \
+    --index-url https://download.pytorch.org/whl/cu124
+
+# 3. (Apple Silicon / CPU) Install PyTorch
+pip install torch==2.5.1
+
+# 4. Install project dependencies
+pip install -r requirements.txt
+
+# 5. Authenticate with Hugging Face
+python -c "from huggingface_hub import login; login()"
+\end{lstlisting}
+
+\subsection{Running the Full Pipeline}
+
+\begin{lstlisting}[language=bash, caption={Five-step pipeline execution}]
+# Step 1 -- Preprocess raw data into document corpus
+python src/data_preprocessing.py
+
+# Step 2 -- Build embedding index
+python src/build_index.py
+
+# Step 3 -- Generate fine-tuning dataset
+python src/generate_finetune_data.py
+
+# Step 4 -- Fine-tune the model with QLoRA (requires NVIDIA GPU)
+python src/finetune.py
+
+# Step 5a -- Interactive CLI mode (uses fine-tuned LoRA if present)
+python src/rag_pipeline.py
+
+# Step 5b -- Single-query mode
+python src/rag_pipeline.py --query "What is the daily transfer limit?"
+\end{lstlisting}
+
+\subsection{Running the Web Interface}
+
+\begin{lstlisting}[language=bash, caption={Starting the API and frontend}]
+# Terminal 1 -- Start the FastAPI backend
+python -m uvicorn src.api.main:app --reload
+# API available at http://localhost:8000
+# Interactive API docs at http://localhost:8000/docs
+
+# Terminal 2 -- Start the Streamlit frontend
+streamlit run frontend/app.py
+# Frontend available at http://localhost:8501
+\end{lstlisting}
+
+\subsection{Docker Compose Deployment}
+
+\begin{lstlisting}[language=bash, caption={Single-command containerised deployment}]
+docker-compose up --build
+# Frontend: http://localhost:8501
+# API:      http://localhost:8000
+# API Docs: http://localhost:8000/docs
+\end{lstlisting}
+
+\subsection{Running Tests}
+
+\begin{lstlisting}[language=bash, caption={Unit test execution (no GPU required)}]
+pytest tests/ -v
+# 43 tests: 32 preprocessing + 11 pipeline (all mocked, GPU-free)
+\end{lstlisting}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Design Decisions and Rationale}
+
+\subsection{Why QLoRA instead of full fine-tuning?}
+
+Full fine-tuning of a 3B-parameter model would require $\approx$24~GB of VRAM
+and multiple hours of training.  QLoRA~\cite{dettmers2023qlora} instead quantises
+the frozen base weights to 4-bit NF4, reducing memory consumption to under 8~GB,
+and trains only the injected low-rank adapter matrices ($\approx$20M trainable
+parameters vs.\ 3B total).  This makes fine-tuning accessible on a consumer
+RTX~4060 while still achieving meaningful domain adaptation.
+
+\subsection{Why generate a synthetic fine-tuning dataset?}
+
+The raw knowledge base contains 314 Q\&A pairs — insufficient for robust fine-tuning.
+By generating exact-match, paraphrased, not-found, and out-of-scope variants, we
+expand the dataset to 960+ examples without additional human annotation.  The
+synthetic examples are grounded in real bank data, so they accurately reflect the
+target distribution.
+
+\subsection{Why a two-layer guard rail?}
+
+The keyword pre-filter catches blatant adversarial inputs before they consume
+any GPU time, reducing cost and latency for blocked queries.  The system-prompt
+layer handles subtler off-topic questions and hallucination risks by constraining
+the LLM's behaviour from within the generation process itself.  Fine-tuning on
+out-of-scope rejection examples further reinforces the system-prompt constraints
+at the weight level.
+
+\subsection{Why FastAPI for the backend?}
+
+FastAPI provides automatic OpenAPI documentation, request/response validation via
+Pydantic models, and asynchronous request handling.  The singleton + lazy-loading
+pattern ensures the LLM (which takes 30--60~seconds to load) is initialised only
+once per server lifetime, making subsequent queries fast.
+
+\subsection{Why Streamlit for the frontend?}
+
+Streamlit allows a full-featured, interactive chat interface to be built in pure
+Python without a separate JavaScript framework.  For a class project requiring a
+functional UI in a short timeframe, this offers the best productivity-to-result
+ratio.
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Project Repository and Demo}
+
+The full source code, data, and this report are available on GitHub:
+
+\begin{center}
+  \url{https://github.com/AhmedSultan2002/LLM-project}
+\end{center}
+
+A screen recording demonstrating the complete Phase~2 system is available at:
+
+\begin{center}
+  \url{VIDEO_URL_PLACEHOLDER}
+\end{center}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\section{Conclusion}
+
+This report presented the complete Phase~2 implementation of the NUST Bank
+Customer Service Assistant.  Building on the Phase~1 RAG prototype, the system
+now delivers:
+
+\begin{itemize}
+  \item \textbf{QLoRA fine-tuning} of Llama~3.2 3B on a domain-specific
+        synthetic dataset (960+ examples), improving response tone and accuracy.
+  \item \textbf{Two-layer guard rails} (keyword pre-filter + system-prompt
+        constraints) that robustly block jailbreak attempts and off-topic queries.
+  \item \textbf{A REST API} (FastAPI) with lazy-loading singleton pattern,
+        serving the RAG pipeline over HTTP with full OpenAPI documentation.
+  \item \textbf{A Streamlit web interface} providing a polished chat experience
+        with source attribution, latency indicators, and session management.
+  \item \textbf{Docker Compose deployment} for one-command reproducible setup
+        with GPU pass-through.
+  \item \textbf{43 automated unit tests} covering preprocessing and pipeline
+        logic, all GPU-free.
+\end{itemize}
+
+% ─────────────────────────────────────────────────────────────────────────────
+\begin{thebibliography}{9}
+
+\bibitem{lewis2020rag}
+Lewis, P., Perez, E., Piktus, A., et al.\ (2020).
+\textit{Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks}.
+NeurIPS 2020.
+\url{https://arxiv.org/abs/2005.11401}
+
+\bibitem{reimers2019sentencebert}
+Reimers, N., \& Gurevych, I.\ (2019).
+\textit{Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks}.
+EMNLP 2019.
+\url{https://arxiv.org/abs/1908.10084}
+
+\bibitem{johnson2019faiss}
+Johnson, J., Douze, M., \& J{\'e}gou, H.\ (2019).
+\textit{Billion-Scale Similarity Search with GPUs}.
+IEEE Transactions on Big Data.
+\url{https://arxiv.org/abs/1702.08734}
+
+\bibitem{llama32}
+Meta AI.\ (2024).
+\textit{Llama 3.2: Lightweight Models for On-device and Edge Deployments}.
+\url{https://ai.meta.com/blog/llama-3-2-connect-2024-vision-edge-mobile-devices/}
+
+\bibitem{dettmers2023qlora}
+Dettmers, T., Pagnoni, A., Holtzman, A., \& Zettlemoyer, L.\ (2023).
+\textit{QLoRA: Efficient Finetuning of Quantized LLMs}.
+NeurIPS 2023.
+\url{https://arxiv.org/abs/2305.14314}
+
+\bibitem{hu2022lora}
+Hu, E., Shen, Y., Wallis, P., et al.\ (2022).
+\textit{LoRA: Low-Rank Adaptation of Large Language Models}.
+ICLR 2022.
+\url{https://arxiv.org/abs/2106.09685}
+
+\bibitem{fastapi}
+Ram{\'i}rez, S.\ (2018).
+\textit{FastAPI: Modern, fast (high-performance) web framework for building APIs with Python}.
+\url{https://fastapi.tiangolo.com}
+
+\bibitem{muennighoff2022mteb}
+Muennighoff, N., et al.\ (2022).
+\textit{MTEB: Massive Text Embedding Benchmark}.
+\url{https://arxiv.org/abs/2210.07316}
+
+\end{thebibliography}
+
+\end{document}
