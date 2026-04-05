@@ -120,10 +120,14 @@ ready deployment:
   \item \textbf{Guard Rails}: a two-layer safety mechanism (keyword pre-filter +
         system-prompt constraints) blocks jailbreak attempts, prompt injection,
         and off-topic queries.
+  \item \textbf{Real-Time Document Ingestion}: a dedicated API endpoint and UI form
+        allow new Q\&A documents to be added to the live knowledge base instantly,
+        without restarting the server or re-running any scripts.
   \item \textbf{REST API}: a FastAPI service exposes the RAG pipeline over HTTP,
         decoupling the heavy model from the user-facing layer.
   \item \textbf{Streamlit Web Interface}: a polished, browser-based chat UI that
-        displays responses, source attribution, and latency metrics.
+        displays responses, source attribution, latency metrics, and a document
+        upload form.
   \item \textbf{Docker Compose}: a single command brings up the entire stack
         (API + frontend) in reproducible containers.
 \end{itemize}
@@ -265,9 +269,10 @@ A \textbf{FastAPI} application~\cite{fastapi} exposes three endpoints:
   \toprule
   Endpoint & Method & Description \\
   \midrule
-  \texttt{/api/v1/health}   & GET  & Liveness probe — confirms retriever is loaded \\
-  \texttt{/api/v1/query}    & POST & Submit a customer query; returns answer + sources + latency \\
-  \texttt{/api/v1/sources}  & GET  & List all unique product categories in the knowledge base \\
+  \texttt{/api/v1/health}     & GET  & Liveness probe — confirms retriever is loaded \\
+  \texttt{/api/v1/query}     & POST & Submit a customer query; returns answer + sources + latency \\
+  \texttt{/api/v1/sources}   & GET  & List all unique product categories in the knowledge base \\
+  \texttt{/api/v1/documents} & POST & Add a new Q\&A document to the live knowledge base \\
   \bottomrule
 \end{tabular}
 \end{center}
@@ -291,6 +296,31 @@ The web interface provides:
   \item \textbf{Custom CSS} matching NUST Bank's professional aesthetic (blue
         primary, card-based layout, subtle shadows).
 \end{itemize}
+
+\subsubsection{Real-Time Document Ingestion (\texttt{POST /api/v1/documents})}
+
+A dedicated endpoint allows new Q\&A entries to be added to the live knowledge
+base without restarting the server or re-running any offline scripts.  When a
+request arrives with \texttt{product}, \texttt{question}, and \texttt{answer}
+fields:
+
+\begin{enumerate}[leftmargin=2em]
+  \item The already-loaded \texttt{SentenceTransformer} embeds the new document
+        text — no model reload required.
+  \item The embedding is added to the \textbf{in-memory FAISS index} via
+        \texttt{index.add()}, making it immediately searchable for subsequent
+        queries.
+  \item The document is appended to the in-memory \texttt{doc\_mapping} list.
+  \item Both the FAISS index and the document mapping are \textbf{persisted to
+        disk} (\texttt{faiss\_index.bin} and \texttt{doc\_mapping.json}), so the
+        update survives a server restart.
+  \item The raw document is also appended to \texttt{processed\_documents.json},
+        ensuring it is included if the index is ever rebuilt from scratch.
+\end{enumerate}
+
+The Streamlit sidebar exposes this as a simple three-field form (Product,
+Question, Answer) that any user can fill in.  On submission the frontend calls
+the API and displays a success message with the updated total document count.
 
 \subsubsection{Containerisation (\texttt{docker-compose.yml})}
 
@@ -420,6 +450,28 @@ pytest tests/ -v
 % ─────────────────────────────────────────────────────────────────────────────
 \section{Design Decisions and Rationale}
 
+\subsection{Why Llama 3.2 3B Instruct?}
+
+The project specification limits model size to $\leq$6B parameters and requires
+an open-source architecture.  Llama~3.2 3B Instruct~\cite{llama32} was chosen
+for the following reasons:
+
+\begin{itemize}
+  \item \textbf{Best-in-class at the size}: at the time of development, Llama~3.2
+        3B Instruct achieves the strongest instruction-following and reasoning
+        performance among publicly available sub-6B models on standard benchmarks.
+  \item \textbf{Hardware fit}: at 4-bit NF4 quantisation it occupies under 3~GB of
+        VRAM, leaving headroom for the LoRA adapter and KV cache on an 8~GB GPU.
+  \item \textbf{Chat template support}: the model ships with a well-defined chat
+        template (\texttt{apply\_chat\_template}), making it straightforward to
+        inject a strict system prompt and enforce role constraints.
+  \item \textbf{Fine-tuning ecosystem}: extensive community support for QLoRA
+        fine-tuning of the Llama family via PEFT and TRL means well-tested
+        recipes are available and hyperparameter guidance is reliable.
+  \item \textbf{Open licence}: Meta's community licence permits academic and
+        research use without cost.
+\end{itemize}
+
 \subsection{Why QLoRA instead of full fine-tuning?}
 
 Full fine-tuning of a 3B-parameter model would require $\approx$24~GB of VRAM
@@ -487,10 +539,14 @@ now delivers:
         synthetic dataset (960+ examples), improving response tone and accuracy.
   \item \textbf{Two-layer guard rails} (keyword pre-filter + system-prompt
         constraints) that robustly block jailbreak attempts and off-topic queries.
+  \item \textbf{Real-time document ingestion} via a REST endpoint and Streamlit
+        form — new Q\&A entries are embedded and searchable instantly, and
+        persisted to disk without any server restart.
   \item \textbf{A REST API} (FastAPI) with lazy-loading singleton pattern,
         serving the RAG pipeline over HTTP with full OpenAPI documentation.
   \item \textbf{A Streamlit web interface} providing a polished chat experience
-        with source attribution, latency indicators, and session management.
+        with source attribution, latency indicators, session management, and a
+        document upload form.
   \item \textbf{Docker Compose deployment} for one-command reproducible setup
         with GPU pass-through.
   \item \textbf{43 automated unit tests} covering preprocessing and pipeline
