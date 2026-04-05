@@ -251,9 +251,7 @@ class Generator:
             outputs = self.model.generate(
                 **inputs,
                 max_new_tokens=LLM_MAX_NEW_TOKENS,
-                temperature=LLM_TEMPERATURE,
-                do_sample=True,
-                top_p=LLM_TOP_P,
+                do_sample=False,
                 repetition_penalty=LLM_REPETITION_PENALTY,
                 pad_token_id=self.tokenizer.eos_token_id,
             )

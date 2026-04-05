@@ -24,11 +24,11 @@ EMBEDDING_DIMENSION = 384
 
 # ─── LLM ──────────────────────────────────────────────────────────────────────
 LLM_MODEL_NAME = "meta-llama/Llama-3.2-3B-Instruct"
-LLM_MAX_NEW_TOKENS = 512
+LLM_MAX_NEW_TOKENS = 256
 LLM_TEMPERATURE = 0.3
 LLM_TOP_P = 0.9
 LLM_REPETITION_PENALTY = 1.1
-LLM_MAX_INPUT_LENGTH = 2048  # Tokenizer truncation limit
+LLM_MAX_INPUT_LENGTH = 1024  # Tokenizer truncation limit
 LLM_USE_4BIT = (
     True  # Enable quantization where supported (CUDA only; ignored on MPS/CPU)
 )
@@ -63,4 +63,4 @@ DEVICE = _detect_device()
 QUANTIZATION_ENABLED = LLM_USE_4BIT and (DEVICE == "cuda")
 
 # ─── RAG ──────────────────────────────────────────────────────────────────────
-RAG_TOP_K = 3  # Number of retrieved chunks for context
+RAG_TOP_K = 2  # Number of retrieved chunks for context
